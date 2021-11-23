@@ -1,0 +1,75 @@
+---
+version: 2.1
+
+orbs:
+  terraform: smartnews/terraform@1
+
+orb_dockers:
+  terraform: &orb_docker_terraform 165463520094.dkr.ecr.ap-northeast-1.amazonaws.com/circleci-orbs/terraform:0.14-1
+
+workflow_filters:
+  master-filter: &master-filter
+    filters:
+      branches:
+        only: master
+
+workflows:
+  version: 2
+  terraform-trigger:
+    when: << pipeline.parameters.workflow_main >>
+    jobs:
+      - terraform/trigger:
+          docker: *orb_docker_terraform
+          name: terraform/trigger
+          system: sn-example # TODO change me
+  terraform:
+    when: << pipeline.parameters.workflow_terraform >>
+    jobs:
+      - terraform/plan:
+          docker: *orb_docker_terraform
+          name: << pipeline.parameters.env >>/<< pipeline.parameters.region >>/plan
+          env: << pipeline.parameters.env >>
+          region: << pipeline.parameters.region >>
+          cluster: << pipeline.parameters.cluster >>
+          system: << pipeline.parameters.system >>
+          path: << pipeline.parameters.path >>
+      - approve:
+          <<: *master-filter
+          name: << pipeline.parameters.env >>/<< pipeline.parameters.region >>/approve
+          type: approval
+          requires:
+            - << pipeline.parameters.env >>/<< pipeline.parameters.region >>/plan
+      - terraform/apply:
+          <<: *master-filter
+          docker: *orb_docker_terraform
+          name: << pipeline.parameters.env >>/<< pipeline.parameters.region >>/apply
+          env: << pipeline.parameters.env >>
+          region: << pipeline.parameters.region >>
+          cluster: << pipeline.parameters.cluster >>
+          system: << pipeline.parameters.system >>
+          path: << pipeline.parameters.path >>
+          requires:
+            - << pipeline.parameters.env >>/<< pipeline.parameters.region >>/approve
+
+parameters:
+  workflow_main:
+    type: boolean
+    default: true
+  workflow_terraform:
+    type: boolean
+    default: false
+  env:
+    type: string
+    default: ""
+  region:
+    type: string
+    default: ""
+  cluster:
+    type: string
+    default: ""
+  system:
+    type: string
+    default: ""
+  path:
+    type: string
+    default: ""
